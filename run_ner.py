@@ -167,7 +167,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
     features = []
     for (ex_index, example) in enumerate(examples):
         if ex_index % 10000 == 0:
-            tf.logging.info("Converting example %d of %d" % (ex_index, len(examples)))
+            logger.info("Converting example %d of %d" % (ex_index, len(examples)))
         textlist = example.text_a.split(' ')
         labels = example.label.split(' ')
         
@@ -225,14 +225,14 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
                         assert len(label_ids) == max_seq_length
 
                         if idx < 10:
-                            tf.logging.info("*** Example ***")
-                            tf.logging.info("guid: %s" % (example.guid))
-                            tf.logging.info("tokens: %s" % " ".join(
+                            logger.info("*** Example ***")
+                            logger.info("guid: %s" % (example.guid))
+                            logger.info("tokens: %s" % " ".join(
                                 [tokenization.printable_text(x) for x in tokens]))
-                            tf.logging.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-                            tf.logging.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-                            tf.logging.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-                            tf.logging.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
+                            logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
+                            logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
+                            logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+                            logger.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
 
 
                         features.append(InputFeatures(
@@ -266,14 +266,14 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
             assert len(label_ids) == max_seq_length
 
             if idx < 10:
-                tf.logging.info("*** Example ***")
-                tf.logging.info("guid: %s" % (example.guid))
-                tf.logging.info("tokens: %s" % " ".join(
+                logger.info("*** Example ***")
+                logger.info("guid: %s" % (example.guid))
+                logger.info("tokens: %s" % " ".join(
                     [tokenization.printable_text(x) for x in tokens]))
-                tf.logging.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-                tf.logging.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-                tf.logging.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-                tf.logging.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
+                logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
+                logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
+                logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+                logger.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
             
             features.append(InputFeatures(
                 input_ids=input_ids,
