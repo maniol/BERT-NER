@@ -81,11 +81,11 @@ class InputExample(object):
 class InputFeatures(object):
     """A single set of features of data."""
 
-    def __init__(self, input_ids, input_mask, segment_ids, label_id, valid_ids=None, label_mask=None):
+    def __init__(self, input_ids, input_mask, segment_ids, label_ids, valid_ids=None, label_mask=None):
         self.input_ids = input_ids
         self.input_mask = input_mask
         self.segment_ids = segment_ids
-        self.label_id = label_id
+        self.label_ids = label_ids
         self.valid_ids = valid_ids
         self.label_mask = label_mask
 
@@ -165,6 +165,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
     label_map = {label: i for i, label in enumerate(label_list)}
 
     features = []
+    idx = 0
     for (ex_index, example) in enumerate(examples):
         if ex_index % 10000 == 0:
             logger.info("Converting example %d of %d" % (ex_index, len(examples)))
@@ -227,8 +228,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
                         if idx < 10:
                             logger.info("*** Example ***")
                             logger.info("guid: %s" % (example.guid))
-                            logger.info("tokens: %s" % " ".join(
-                                [tokenization.printable_text(x) for x in tokens]))
+                            logger.info("tokens: %s" % " ".join([x for x in tokens]))
                             logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
                             logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
                             logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
