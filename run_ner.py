@@ -177,7 +177,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
         
         tokens.append("[CLS]")
         segment_ids.append(0)
-        labels_ids.append(label_map["[pad]"])
+        label_ids.append(label_map["[pad]"])
 
         skip_until_eos = False
         last_eos_idx = 0
