@@ -287,8 +287,6 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
                         if idx < 10:
                             logger.info("*** Example ***")
                             logger.info("guid: %s" % (example.guid))
-                            logger.info("tokens: %s" % " ".join(
-                                [tokenization.printable_text(x) for x in tokens]))
                             logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
                             logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
                             logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
@@ -347,8 +345,6 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
             if idx < 10:
                 logger.info("*** Example ***")
                 logger.info("guid: %s" % (example.guid))
-                logger.info("tokens: %s" % " ".join(
-                    [tokenization.printable_text(x) for x in tokens]))
                 logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
                 logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
                 logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
