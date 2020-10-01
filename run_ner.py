@@ -153,9 +153,9 @@ class NerProcessor(DataProcessor):
         examples = []
         for i, (sent, lab) in enumerate(zip(data['sentence'],data['label'])):
             guid = "%s-%s" % (set_type, i)
-            text_a = tokenization.convert_to_unicode(sent)
+            text_a = sent
             text_b = None
-            label = tokenization.convert_to_unicode(lab)
+            label = lab
             examples.append(InputExample(
                 guid=guid, text_a=text_a, text_b=text_b, label=label))
         return examples
