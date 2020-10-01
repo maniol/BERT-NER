@@ -123,9 +123,10 @@ class DataProcessor(object):
         raise NotImplementedError()
 
     @classmethod
-    def _read_data(self, data_dir, data_set):
+    def _read_tsv(self, data_dir, dataset_type):
         """Reads a tab separated value file."""
-        return readfile(data_dir, data_set)
+        return readfile(data_dir, dataset_type)
+
 
 class NerProcessor(DataProcessor):
     """Processor for the CoNLL-2003 data set."""
@@ -133,102 +134,161 @@ class NerProcessor(DataProcessor):
     def get_train_examples(self, data_dir):
         """See base class."""
         return self._create_examples(
-            self._read_data(data_dir,"train"), "train")
+            self._read_tsv(data_dir, "train"), "train")
 
     def get_dev_examples(self, data_dir):
         """See base class."""
         return self._create_examples(
-            self._read_data(data_dir, "dev"), "dev")
+            self._read_tsv(data_dir, "valid"), "dev")
 
     def get_test_examples(self, data_dir):
         """See base class."""
         return self._create_examples(
-            self._read_data(data_dir, "test"), "test")
+            self._read_tsv(data_dir, "test"), "test")
 
     def get_labels(self):
         return ["0", "1", "2", "3","X", "[pad]"]
 
     def _create_examples(self, data, set_type):
         examples = []
-        for i, (sent, lab) in enumerate(zip(data['sentence'], data['label'])):
+        for i, (sent, lab) in enumerate(zip(data['sentence'],data['label'])):
             guid = "%s-%s" % (set_type, i)
-            text_a = sent
+            text_a = tokenization.convert_to_unicode(sent)
             text_b = None
-            label = lab
+            label = tokenization.convert_to_unicode(lab)
             examples.append(InputExample(
                 guid=guid, text_a=text_a, text_b=text_b, label=label))
         return examples
 
+#Symbols that denote end of a sentence
+#Remove 3 if using Chinese text 
+EOS = ['1','3']
+
 def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer):
-    """Loads a data file into a list of `InputBatch`s."""
-    EOS = ['1']
-    label_map = {label: i for i, label in enumerate(label_list)}
+    
+    """
+        Converts examples to tensorflow examples and 
+        write them using TFRecordWriter to output_file
+        
+        Basic difference with BERT is that one single 
+        Input example can be converted to multiple 
+        tf_examples.
+        Args:
+            examples: A list of Input Example objects
+            label_list:  The list of all the possible labels
+            max_seq_length: Length of each feature for BERT model
+            tokenizer: BERT tokenizer
+            output_file: File for writing the tf_examples
+        
+        Returns:
+            idx: The count of the tf_examples written
+              
+    """
+
+    #label_map is a dictionary for converting labels to ids
+    label_map = {}
+    for (i, label) in enumerate(label_list):
+        label_map[label] = i
+
 
     features = []
+    
+    #variable to count the number of input examples
     idx = 0
     for (ex_index, example) in enumerate(examples):
         if ex_index % 10000 == 0:
             logger.info("Converting example %d of %d" % (ex_index, len(examples)))
+
+        
         textlist = example.text_a.split(' ')
         labels = example.label.split(' ')
-        
+
         label_ids = []
         tokens = []
         segment_ids = []
-        
+        valid = []
+        label_mask = []
+        #Add CLS token  
         tokens.append("[CLS]")
         segment_ids.append(0)
+        valid.append(0)
+        label_mask.append(0)
         label_ids.append(label_map["[pad]"])
 
+        #used for skipping sentences with more than 128 tokens
         skip_until_eos = False
         last_eos_idx = 0
 
         for i, word in enumerate(textlist):
             bert_tokens = tokenizer.tokenize(word)
-            for m, bert_token in enumerate(bert_tokens):
+            for j, bert_token in enumerate(bert_tokens):
+                
+                #Skip words till the labels are not in EOS
                 if skip_until_eos:
                     if labels[i] in EOS:
                         skip_until_eos = False
+
                     continue
+
                 if labels[i] in EOS:
                     last_eos_idx = len(tokens)
+
                 tokens.append(bert_token)
                 segment_ids.append(0)
-
-                if m == len(bert_tokens)-1:
+                
+                if j == len(bert_tokens)-1:
+                    #label the last token as the true label
                     label_ids.append(label_map[labels[i]])
+                    valid.append(1)
+                    label_mask.append(True)  
                 else:
-                    label_ids.append(label_map['X'])
+                    #label rest of the tokens as X
+                    label_ids.append(label_map["X"])
+                    valid.append(0)
+                    label_mask.append(0)
 
-                if len(tokens) == max_seq_length - 1:
-                    assert len(tokens) == len(label_ids), "#words: %d; #punctuations: %d" % (len(tokens, len(label_ids)))
+                if len(tokens) == max_seq_length-1:
+                    assert len(tokens) ==  len(label_ids) ,"#words: %d; #punctuations: %d" \
+                    % (len(tokens), len(label_ids))
 
+                    #if example has a sentence that is more than 128 tokens, skip it    
                     if last_eos_idx == 0:
                         skip_until_eos = True
+
                         label_ids = []
                         tokens = []
                         segment_ids = []
+                        valid = []
+                        label_mask = []
                         tokens.append("[CLS]")
                         segment_ids.append(0)
                         label_ids.append(label_map["[pad]"])
+                        valid.append(0)
+                        label_mask.append(0)
+                    
+                    #Else add the sequence of 128 tokens with labels to the output file
                     else:
                         tokens.append("[SEP]")
                         segment_ids.append(0)
                         label_ids.append(label_map["[pad]"])
-                        
+                        valid.append(0)
+                        label_mask.append(0)
+                    
                         input_ids = tokenizer.convert_tokens_to_ids(tokens)
                         input_mask = [1] * len(input_ids)
 
-                        
                         assert len(input_ids) == max_seq_length
                         assert len(input_mask) == max_seq_length
                         assert len(segment_ids) == max_seq_length
                         assert len(label_ids) == max_seq_length
+                        assert len(valid) == max_seq_length
+                        assert len(label_mask) == max_seq_length
 
                         if idx < 10:
                             logger.info("*** Example ***")
                             logger.info("guid: %s" % (example.guid))
-                            logger.info("tokens: %s" % " ".join([x for x in tokens]))
+                            logger.info("tokens: %s" % " ".join(
+                                [tokenization.printable_text(x) for x in tokens]))
                             logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
                             logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
                             logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
@@ -239,17 +299,32 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
                             input_ids=input_ids,
                             input_mask=input_mask,
                             segment_ids=segment_ids,
-                            label_ids=label_ids
+                            label_ids=label_ids,
+                            valid_ids=valid,
+                            label_mask=label_mask
                         ))
+                        
+                        
                         idx += 1
+
+                        #Continue to process the rest of the example
+                        rest = len(segment_ids[last_eos_idx+1:-1])
                         tokens = ["[CLS]"] + tokens[last_eos_idx+1:-1]
                         segment_ids = [0] + segment_ids[last_eos_idx+1:-1]
                         label_ids = [label_map["[pad]"]] + label_ids[last_eos_idx+1:-1]
-                    last_eos_idx = 0
+                        valid = [0] + valid[last_eos_idx+1:-1]
+                        label_mask = [0] + label_mask[last_eos_idx+1:-1]
+
+                    last_eos_idx = 0 
+        
+        #if the tokens are less than 128 for tf_example. Pad it with pad tokens.
         if len(tokens) > 2:
+
             tokens.append("[SEP]")
             segment_ids.append(0)
             label_ids.append(label_map["[pad]"])
+            valid.append(0)
+            label_mask.append(0)
             
             input_ids = tokenizer.convert_tokens_to_ids(tokens)
             input_mask = [1] * len(input_ids)
@@ -259,12 +334,16 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
                 input_mask.append(0)
                 segment_ids.append(0)
                 label_ids.append(label_map["[pad]"])
+                valid.append(0)
+                label_mask.append(0)
                 
             assert len(input_ids) == max_seq_length
             assert len(input_mask) == max_seq_length
             assert len(segment_ids) == max_seq_length
             assert len(label_ids) == max_seq_length
-
+            assert len(valid) == max_seq_length
+            assert len(label_mask) == max_seq_length
+                
             if idx < 10:
                 logger.info("*** Example ***")
                 logger.info("guid: %s" % (example.guid))
@@ -279,10 +358,11 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
                 input_ids=input_ids,
                 input_mask=input_mask,
                 segment_ids=segment_ids,
-                label_ids=label_ids
+                label_ids=label_ids,
+                valid_ids=valid,
+                label_mask=label_mask
             ))
             idx += 1
-                        
     return features
 
 def main():
@@ -443,8 +523,10 @@ def main():
     num_train_optimization_steps = 0
     if args.do_train:
         train_examples = processor.get_train_examples(args.data_dir)
+        train_features = convert_examples_to_features(
+            train_examples, label_list, args.max_seq_length, tokenizer)
         num_train_optimization_steps = int(
-            len(train_examples) / args.train_batch_size / args.gradient_accumulation_steps) * args.num_train_epochs
+            len(train_features) / args.train_batch_size / args.gradient_accumulation_steps) * args.num_train_epochs
         if args.local_rank != -1:
             num_train_optimization_steps = num_train_optimization_steps // torch.distributed.get_world_size()
 
@@ -492,8 +574,6 @@ def main():
     tr_loss = 0
     label_map = {i : label for i, label in enumerate(label_list,1)}
     if args.do_train:
-        train_features = convert_examples_to_features(
-            train_examples, label_list, args.max_seq_length, tokenizer)
         logger.info("***** Running training *****")
         logger.info("  Num examples = %d", len(train_examples))
         logger.info("  Batch size = %d", args.train_batch_size)
